@@ -1,4 +1,4 @@
-# Jaheim Cain 
+"""Module for GitHub API testing and automation."""
 
 
 
@@ -99,7 +99,8 @@ def github_api_calls():
 
     
 
-    res = subprocess.run(['git', 'fetch'], check=True, capture_output=True, text=True)
+    subprocess.run(['git', 'fetch'], check=True, capture_output=True, text=True)
+    subprocess.run(['git', 'pull'], check=True, capture_output=True, text=True)
 
     
     #output = requests.get(f'https://api.github.com/repos/jc41809-sw/Work-scripts/zipball', headers=header)
