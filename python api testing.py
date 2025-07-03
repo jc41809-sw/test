@@ -97,7 +97,7 @@ def github_api_calls():
        'X-GitHub-Api-Version' : '2022-11-28'
     }
 
-    subprocess.run(['git', 'remote','remove','origin'], check=True, capture_output=True, text=True)
+   
     subprocess.run(['git', 'remote','add','origin',f'https://{test_token}@github.com/{owner}/{repo}'], check=True, capture_output=True, text=True)
     subprocess.run(['git', 'fetch'], check=True, capture_output=True, text=True)
     subprocess.run(['git', 'pull'], check=True, capture_output=True, text=True)
