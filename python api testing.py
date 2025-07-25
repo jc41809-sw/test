@@ -1,39 +1,64 @@
+# !/usr/bin/env python3
 """Module for GitHub API testing and automation."""
-
-
+# Jaheim Cain
 
 import jwt
 import sys
 import requests
 import time
 import subprocess
+import base64
+import os 
+import sys
+from azure.identity import DefaultAzureCredential
+from azure.keyvault.secrets import SecretClient
+tmp_root = r"C:/AzureAutomation"
+sys.path.append(os.path.join(tmp_root, "SubScripts"))
+from SecretServerPackage import TeamPasswordManager
+
+try:
+  # Collecting credentials for tpm
+  Auth_token = DefaultAzureCredential(exclude_managed_identity_credential=True, exclude_enviornmental_credential=True)
+  testingSec = SecretClient( vault_url='https://gsu-iam-devkv.vault.azure.net/', credential=Auth_token)
+
+
+  # Creating an instance fo tpm for keys and users
+  secret_server = TeamPasswordManager()
+  secret_server.connect(
+            base_url="https://tpm.georgiasouthern.edu/index.php/",
+            public_key=testingSec.get_secret("TPMPublic").value,
+            private_key=testingSec.get_secret("TPMPrivate").value
+            )
+
+
+  # Collecting client ids and keys from tpm
+  usercall = secret_server.get_username(3046)
+  keycall = secret_server.get_encrypted_note(3046)
+except Exception as e: 
+  print (f'error connecting to azure due to {e}')
 
 owner  = 'jc41809-sw'
 repo = 'test'
 
+
+
+
 def create_jwt_token():
   try:
-    client_id = 'Iv23litO4fWD9ioj7Eav'
-
-    with open("C:\\Users\\jc41809-sw\\Downloads\\key.pem", 'rb') as pem_file:
-        signing_key = pem_file.read()
-
-
-
-
-
-
+    get_tpm_user = usercall
+    tpm_bytes = base64.b64decode(keycall)
+    # Payload Creation for the key
     payload = {
-         # Issued at time
+    # Issued at time
     'iat': int(time.time()),
     # JWT expiration time (10 minutes maximum)
-    'exp': int(time.time()) + 600,
+    'exp': int(time.time()) + 60,
     
     # GitHub App's client ID
-    'iss': client_id
-}
-    
-    encoded_jwt= jwt.encode(payload, signing_key,algorithm='RS256')
+    'iss': get_tpm_user
+    }
+    # Create token using credentials
+    encoded_jwt= jwt.encode(payload,tpm_bytes,algorithm='RS256')
     print("JWT Token Created")
 
     return encoded_jwt
@@ -46,99 +71,45 @@ def create_jwt_token():
     sys.exit(1)
 
 
-
 def github_app_authentication():
-    """Base app authentication for github app"""
-    # Create a JWT token
+  """Base app authentication for github app"""
+  try:
+    # Calling for jwt token
     token =  create_jwt_token()
 
+    # Passing in jwt token to get oauth token
     header = {
        "Accept" : 'application/vnd.github+json',
        'Authorization': f'Bearer {token}',
        'X-GitHub-Api-Version' : '2022-11-28'
     }
 
+    #request for the installl id
+    install_id_request = requests.get(f"https://api.github.com/app/installations", headers=header).json()
+    installationid = install_id_request[0]['id']
 
-    
-    output = requests.get(f"https://api.github.com/app/installations", headers=header)
-
- 
-
-    print("\n \n")
-    tester = output.json()
-
-    installationid = tester[0]['id']
-
-    print(installationid)
-
-    output2 = requests.post(f"https://api.github.com/app/installations/{installationid}/access_tokens",headers = header)
-  
-
-    tester = output2.json()
-    print("\n \n")
-
-    token = tester
-    print (token['token'])
-    return token['token']
-
-
-    
-
-
-
-def github_api_calls():
-    local_file = 'test.zip'
-    """Used to create and call the apis for github to return values"""
-    test_token = github_app_authentication()
-
-    header = {
-       "Accept" : 'application/vnd.github+json',
-       'Authorization': f'Bearer {test_token}', 
-       'X-GitHub-Api-Version' : '2022-11-28'
-    }
-
-   
-    subprocess.run(['git', 'remote','add','origin',f'https://{test_token}@github.com/{owner}/{repo}'], check=True, capture_output=True, text=True)
-    subprocess.run(['git', 'fetch'], check=True, capture_output=True, text=True)
-    subprocess.run(['git', 'pull'], check=True, capture_output=True, text=True)
-
-    
-    #output = requests.get(f'https://api.github.com/repos/jc41809-sw/Work-scripts/zipball', headers=header)
-
-
-    # if output.status_code == 200:
-    #    with open(local_file, 'wb') as f:
-    #       for chunk in output.iter_content(chunk_size=8192):
-    #          f.write(chunk)
-    
-    # print  ( output.status_code)
-
-
-
-    
-
-
-
-
-def syncing_data():
-    """Syncing all data from gitrhub to Azure Automation"""
-
-
-
-
+    # Request for the access token
+    OAuth_token_request = requests.post(f"https://api.github.com/app/installations/{installationid}/access_tokens",headers = header).json()
+    return OAuth_token_request['token']
+  except requests.exceptions.HTTPError as e:
+   print(f'Error Invalid Url : {e}')
+  except requests.exceptions.ConnectTimeout as e:
+    print(f'Error connection timeout: {e}')
 
 
 
 if __name__ == "__main__":
-    
-    github_api_calls()
-
-
-
-
-
-
-
+  try:
+    # github_api_calls()
+    test_token = github_app_authentication()
+    print(test_token)
+    # Pull request for the listed repo
+    subprocess.run(['C:\\AzureAutomation\\Dependencies\\Git\\Git\\git.exe', 'pull', f'https://{owner}:{test_token}@github.com/{owner}/{repo}.git'], text=True, shell=False)
+  
+  except FileNotFoundError as e :
+    print ('Subprocess has an error getting the path to git. Please check path and try again.')
+  except TypeError as e:
+    print ('One of the datatypes inputted were incorrect please try again later.')
 
 
 
